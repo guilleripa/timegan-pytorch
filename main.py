@@ -17,11 +17,14 @@ from sklearn.model_selection import train_test_split
 # Self-Written Modules
 from data.data_preprocess import data_preprocess
 from metrics.metric_utils import (
-    feature_prediction, one_step_ahead_prediction, reidentify_score
+    feature_prediction,
+    one_step_ahead_prediction,
+    reidentify_score,
 )
 
 from models.timegan import TimeGAN
 from models.utils import timegan_trainer, timegan_generator
+
 
 def main(args):
     ##############################################
@@ -45,7 +48,7 @@ def main(args):
     out_dir = os.path.abspath(args.model_path)
     if not os.path.exists(out_dir):
         os.makedirs(out_dir, exist_ok=True)
-    
+
     # TensorBoard directory
     tensorboard_path = os.path.abspath("./tensorboard")
     if not os.path.exists(tensorboard_path):
@@ -60,7 +63,7 @@ def main(args):
     # Initialize random seed and CUDA
     ##############################################
 
-    os.environ['PYTHONHASHSEED'] = str(args.seed)
+    os.environ["PYTHONHASHSEED"] = str(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -118,7 +121,7 @@ def main(args):
     #########################
     # Save train and generated data for visualization
     #########################
-    
+
     # Save splitted data and generated data
     with open(f"{args.model_path}/train_data.pickle", "wb") as fb:
         pickle.dump(train_data, fb)
@@ -140,7 +143,9 @@ def main(args):
     # Define enlarge data and its labels
     enlarge_data = np.concatenate((train_data, test_data), axis=0)
     enlarge_time = np.concatenate((train_time, test_time), axis=0)
-    enlarge_data_label = np.concatenate((np.ones([train_data.shape[0], 1]), np.zeros([test_data.shape[0], 1])), axis=0)
+    enlarge_data_label = np.concatenate(
+        (np.ones([train_data.shape[0], 1]), np.zeros([test_data.shape[0], 1])), axis=0
+    )
 
     # Mix the order
     idx = np.random.permutation(enlarge_data.shape[0])
@@ -152,133 +157,83 @@ def main(args):
     #########################
 
     # 1. Feature prediction
-    feat_idx = np.random.permutation(train_data.shape[2])[:args.feat_pred_no]
+    feat_idx = np.random.permutation(train_data.shape[2])[: args.feat_pred_no]
     print("Running feature prediction using original data...")
     ori_feat_pred_perf = feature_prediction(
-        (train_data, train_time), 
-        (test_data, test_time),
-        feat_idx
+        (train_data, train_time), (test_data, test_time), feat_idx
     )
     print("Running feature prediction using generated data...")
     new_feat_pred_perf = feature_prediction(
-        (generated_data, generated_time),
-        (test_data, test_time),
-        feat_idx
+        (generated_data, generated_time), (test_data, test_time), feat_idx
     )
 
     feat_pred = [ori_feat_pred_perf, new_feat_pred_perf]
 
-    print('Feature prediction results:\n' +
-          f'(1) Ori: {str(np.round(ori_feat_pred_perf, 4))}\n' +
-          f'(2) New: {str(np.round(new_feat_pred_perf, 4))}\n')
+    print(
+        "Feature prediction results:\n"
+        + f"(1) Ori: {str(np.round(ori_feat_pred_perf, 4))}\n"
+        + f"(2) New: {str(np.round(new_feat_pred_perf, 4))}\n"
+    )
 
     # 2. One step ahead prediction
     print("Running one step ahead prediction using original data...")
     ori_step_ahead_pred_perf = one_step_ahead_prediction(
-        (train_data, train_time), 
-        (test_data, test_time)
+        (train_data, train_time), (test_data, test_time)
     )
     print("Running one step ahead prediction using generated data...")
     new_step_ahead_pred_perf = one_step_ahead_prediction(
-        (generated_data, generated_time),
-        (test_data, test_time)
+        (generated_data, generated_time), (test_data, test_time)
     )
 
     step_ahead_pred = [ori_step_ahead_pred_perf, new_step_ahead_pred_perf]
 
-    print('One step ahead prediction results:\n' +
-          f'(1) Ori: {str(np.round(ori_step_ahead_pred_perf, 4))}\n' +
-          f'(2) New: {str(np.round(new_step_ahead_pred_perf, 4))}\n')
+    print(
+        "One step ahead prediction results:\n"
+        + f"(1) Ori: {str(np.round(ori_step_ahead_pred_perf, 4))}\n"
+        + f"(2) New: {str(np.round(new_step_ahead_pred_perf, 4))}\n"
+    )
 
     print(f"Total Runtime: {(time.time() - start)/60} mins\n")
 
     return None
 
+
 def str2bool(v):
     if isinstance(v, bool):
-       return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
         return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    elif v.lower() in ("no", "false", "f", "n", "0"):
         return False
     else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+        raise argparse.ArgumentTypeError("Boolean value expected.")
+
 
 if __name__ == "__main__":
     # Inputs for the main function
     parser = argparse.ArgumentParser()
 
     # Experiment Arguments
-    parser.add_argument(
-        '--device',
-        choices=['cuda', 'cpu'],
-        default='cuda',
-        type=str)
-    parser.add_argument(
-        '--exp',
-        default='test',
-        type=str)
-    parser.add_argument(
-        "--is_train",
-        type=str2bool,
-        default=True)
-    parser.add_argument(
-        '--seed',
-        default=0,
-        type=int)
-    parser.add_argument(
-        '--feat_pred_no',
-        default=2,
-        type=int)
+    parser.add_argument("--device", choices=["cuda", "cpu"], default="cuda", type=str)
+    parser.add_argument("--exp", default="test", type=str)
+    parser.add_argument("--is_train", type=str2bool, default=True)
+    parser.add_argument("--seed", default=0, type=int)
+    parser.add_argument("--feat_pred_no", default=2, type=int)
 
     # Data Arguments
-    parser.add_argument(
-        '--max_seq_len',
-        default=100,
-        type=int)
-    parser.add_argument(
-        '--train_rate',
-        default=0.5,
-        type=float)
+    parser.add_argument("--max_seq_len", default=100, type=int)
+    parser.add_argument("--train_rate", default=0.5, type=float)
 
     # Model Arguments
-    parser.add_argument(
-        '--emb_epochs',
-        default=600,
-        type=int)
-    parser.add_argument(
-        '--sup_epochs',
-        default=600,
-        type=int)
-    parser.add_argument(
-        '--gan_epochs',
-        default=600,
-        type=int)
-    parser.add_argument(
-        '--batch_size',
-        default=128,
-        type=int)
-    parser.add_argument(
-        '--hidden_dim',
-        default=20,
-        type=int)
-    parser.add_argument(
-        '--num_layers',
-        default=3,
-        type=int)
-    parser.add_argument(
-        '--dis_thresh',
-        default=0.15,
-        type=float)
-    parser.add_argument(
-        '--optimizer',
-        choices=['adam'],
-        default='adam',
-        type=str)
-    parser.add_argument(
-        '--learning_rate',
-        default=1e-3,
-        type=float)
+    parser.add_argument("--emb_epochs", default=600, type=int)
+    parser.add_argument("--sup_epochs", default=600, type=int)
+    parser.add_argument("--gan_epochs", default=600, type=int)
+    parser.add_argument("--batch_size", default=128, type=int)
+    parser.add_argument("--hidden_dim", default=20, type=int)
+    parser.add_argument("--num_layers", default=3, type=int)
+    parser.add_argument("--dis_thresh", default=0.15, type=float)
+    parser.add_argument("--optimizer", choices=["adam"], default="adam", type=str)
+    parser.add_argument("--learning_rate", default=1e-3, type=float)
 
     args = parser.parse_args()
 
