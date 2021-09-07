@@ -1,10 +1,31 @@
-# %%
 from pathlib import Path
-from typing import List, Tuple
+from typing import Any, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
+from scipy import stats
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+
+DATA_PATH = Path("/Volumes/GuilleSSD/edc_data")
+
+
+def load_data(
+    appliance_consumption_path: Union[Path, str],
+    metadata_path: Union[Path, str],
+    merge_on: str = "meter_id",
+    parse_dates: list = ["datetime"],
+    selected_customers: list = [170001, 170004, 170005, 170006, 170008],
+) -> pd.DataFrame:
+    df = pd.read_csv(appliance_consumption_path, parse_dates=parse_dates)
+    metadata = pd.read_csv(metadata_path)
+
+    if selected_customers:
+        customer_meters = metadata[metadata["customer_id"].isin(selected_customers)]
+        appliance_meters = customer_meters[customer_meters["appl_type"] != "site meter"]
+        df = df[df["meter_id"].isin(appliance_meters["meter_id"])]
+
+    return df.merge(metadata, on=merge_on)
 
 
 def data_preprocess(
@@ -15,43 +36,42 @@ def data_preprocess(
     scaling_method: str = "minmax",
     column_name: str = "apower",
     index_column: str = "datetime",
+    dropna: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Cargar los datos.
-    hacerlos un coso 3d
-    filas: secuencias
-    columna: timestamp
-    profundidad: columnas del dataset
-    """
-    # selecciono la columna
-    # dado un timestamp, juntame todo
 
     if not index_column and index_column not in df:
         raise ValueError(f"{index_column} not in df")
 
-    if column_name in df:
-        df = df[[index_column, column_name]]
-    else:
+    if column_name not in df:
         raise ValueError(f"{column_name} not in df")
 
+    if dropna:
+        df = df.dropna(subset=[column_name])
 
-# %%
-DATA_PATH = Path("/Volumes/GuilleSSD/edc_data")
-df = pd.read_csv(DATA_PATH / "appliance_consumption_data.csv", parse_dates=["datetime"])
-appliances = pd.read_csv(DATA_PATH / "appliances.csv")
+    X = create_intervals(df, max_seq_len, column_name)
 
-# %%
-df = df[["datetime", "meter_id", "apower"]]
-# yo lo que quiero es agrupar por meter primero, después cada meter cortarlo en intervalos
-# %%
-df = df.dropna(subset=["apower"])
-test = df[df["meter_id"] == "00124B0002CBABF1"]
-# %%
-# %%
-# tengo un meter solo, quiero que me devuelvas rows con intervalos
+    return X
 
 
-def get_intervals(
+def create_intervals(
+    df: pd.DataFrame, max_seq_len: int, column_name: str
+) -> np.ndarray:
+    X = None
+    for meter_id in df["meter_id"].unique():
+        if len(df[df["meter_id"] == meter_id]) != 0:
+
+            X_meter = create_meter_intervals(
+                df[df["meter_id"] == meter_id], max_seq_len, column_name
+            )
+            if X is None:
+                X = X_meter
+            else:
+                X = np.concatenate((X, X_meter), axis=0)
+
+    return X
+
+
+def create_meter_intervals(
     df: pd.DataFrame,
     seq_length: int,
     column_name: str,
@@ -82,29 +102,3 @@ def get_intervals(
                 series = np.concatenate((series, interval), axis=0)
 
     return series
-
-
-X_test = get_intervals(test, 30, "apower")
-# %%
-X_test.shape
-# %%
-selected_customers = [170001, 170004, 170005, 170006, 170008]
-customer_meters = appliances[appliances["customer_id"].isin(selected_customers)]
-appliance_meters = customer_meters[customer_meters["appl_type"] != "site meter"]
-data = df[df["meter_id"].isin(appliance_meters["meter_id"])]
-
-column_name = "apower"
-seq_length = 30  # x cantidad de minutos
-X = None
-for meter_id in appliance_meters["meter_id"].unique():
-    if len(data[data["meter_id"] == meter_id]) != 0:
-
-        X_meter = get_intervals(
-            data[data["meter_id"] == meter_id], seq_length, column_name
-        )
-        if X is None:
-            X = X_meter
-        else:
-            X = np.stack((X, X_meter), axis=0)
-
-# %%
