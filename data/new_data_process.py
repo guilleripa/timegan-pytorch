@@ -31,13 +31,11 @@ def load_data(
 def data_preprocess(
     df: pd.DataFrame,
     max_seq_len: int,
-    padding_value: float = -1.0,
-    impute_method: str = "mode",
     scaling_method: str = "minmax",
     column_name: str = "apower",
     index_column: str = "datetime",
     dropna: bool = True,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> np.ndarray:
 
     if not index_column and index_column not in df:
         raise ValueError(f"{index_column} not in df")
@@ -56,14 +54,14 @@ def data_preprocess(
 def create_intervals(
     df: pd.DataFrame, max_seq_len: int, column_name: str
 ) -> np.ndarray:
-    X = None
+    X = np.array([])
     for meter_id in df["meter_id"].unique():
         if len(df[df["meter_id"] == meter_id]) != 0:
 
             X_meter = create_meter_intervals(
                 df[df["meter_id"] == meter_id], max_seq_len, column_name
             )
-            if X is None:
+            if X.size == 0:
                 X = X_meter
             else:
                 X = np.concatenate((X, X_meter), axis=0)
@@ -77,10 +75,10 @@ def create_meter_intervals(
     column_name: str,
     offset: DateOffset = DateOffset(minutes=30),
     error: DateOffset = DateOffset(seconds=10),
-) -> np.array:
+) -> np.ndarray:
     next_datetime = df["datetime"].shift(-1)
 
-    series = None
+    series = np.array([])
     current_date = df["datetime"].iloc[0]
 
     while current_date:
@@ -96,7 +94,7 @@ def create_meter_intervals(
 
         if len(interval) == seq_length:
             interval = np.array([interval[column_name]])
-            if series is None:
+            if series.size == 0:
                 series = interval
             else:
                 series = np.concatenate((series, interval), axis=0)
