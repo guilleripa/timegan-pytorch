@@ -52,7 +52,7 @@ def data_preprocess(
 
     X = scale_intervals(X, scaling_method)
 
-    return X
+    return np.expand_dims(X, -1)
 
 
 def remove_outliers(df: pd.DataFrame, column_name: str) -> pd.DataFrame:

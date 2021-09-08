@@ -8,22 +8,22 @@ import random
 import shutil
 import time
 
+import joblib
+
 # 3rd-Party Modules
 import numpy as np
 import torch
-import joblib
 from sklearn.model_selection import train_test_split
 
 # Self-Written Modules
-from data.data_preprocess import data_preprocess
+from data.new_data_process import data_preprocess, load_data
 from metrics.metric_utils import (
     feature_prediction,
     one_step_ahead_prediction,
     reidentify_score,
 )
-
 from models.timegan import TimeGAN
-from models.utils import timegan_trainer, timegan_generator
+from models.utils import timegan_generator, timegan_trainer
 
 
 def main(args):
@@ -83,16 +83,20 @@ def main(args):
     # Load and preprocess data for model
     #########################
 
-    data_path = "data/stock.csv"
-    X, T, _, args.max_seq_len, args.padding_value = data_preprocess(
-        data_path, args.max_seq_len
+    seq_len = 30
+    df = load_data(
+        f"{data_path}/appliance_consumption_data.csv", f"{data_path}/appliances.csv"
     )
+    X = data_preprocess(df, seq_len)
+    T = [seq_len] * len(X)
 
     print(f"Processed data: {X.shape} (Idx x MaxSeqLen x Features)\n")
-    print(f"Original data preview:\n{X[:2, :10, :2]}\n")
+    print(f"Original data preview:\n{X[:2, :10]}\n")
 
     args.feature_dim = X.shape[-1]
     args.Z_dim = X.shape[-1]
+    args.padding_value = -1
+    args.max_seq_len = seq_len
 
     # Train-Test Split data and time
     train_data, test_data, train_time, test_time = train_test_split(
@@ -107,7 +111,7 @@ def main(args):
     start = time.time()
 
     model = TimeGAN(args)
-    if args.is_train == True:
+    if args.is_train:
         timegan_trainer(model, train_data, train_time, args)
     generated_data = timegan_generator(model, train_time, args)
     generated_time = train_time
@@ -116,25 +120,8 @@ def main(args):
     end = time.time()
 
     print(f"Generated data preview:\n{generated_data[:2, -10:, :2]}\n")
+    print(f"Generated data shape:\n{generated_data.shape}\n")
     print(f"Model Runtime: {(end - start)/60} mins\n")
-
-    #########################
-    # Save train and generated data for visualization
-    #########################
-
-    # Save splitted data and generated data
-    with open(f"{args.model_path}/train_data.pickle", "wb") as fb:
-        pickle.dump(train_data, fb)
-    with open(f"{args.model_path}/train_time.pickle", "wb") as fb:
-        pickle.dump(train_time, fb)
-    with open(f"{args.model_path}/test_data.pickle", "wb") as fb:
-        pickle.dump(test_data, fb)
-    with open(f"{args.model_path}/test_time.pickle", "wb") as fb:
-        pickle.dump(test_time, fb)
-    with open(f"{args.model_path}/fake_data.pickle", "wb") as fb:
-        pickle.dump(generated_data, fb)
-    with open(f"{args.model_path}/fake_time.pickle", "wb") as fb:
-        pickle.dump(generated_time, fb)
 
     #########################
     # Preprocess data for seeker
