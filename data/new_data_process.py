@@ -1,3 +1,4 @@
+# %%
 from pathlib import Path
 from typing import Union
 
@@ -6,6 +7,7 @@ import pandas as pd
 from pandas.tseries.offsets import DateOffset
 from scipy import stats
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from torch._C import Value
 
 DATA_PATH = Path("/Volumes/GuilleSSD/edc_data")
 
@@ -35,6 +37,7 @@ def data_preprocess(
     column_name: str = "apower",
     index_column: str = "datetime",
     dropna: bool = True,
+    appliances: Union[list, str] = "all",
 ) -> np.ndarray:
 
     if not index_column and index_column not in df:
@@ -45,6 +48,8 @@ def data_preprocess(
 
     if dropna:
         df = df.dropna(subset=[column_name])
+
+    df = select_appliances(df, appliances)
 
     df = remove_outliers(df, column_name)
 
@@ -61,6 +66,21 @@ def remove_outliers(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
     z_filter = np.abs(z_scores) < 3
     df = df[z_filter]
     print(f"Dropped {original_len - len(df)} rows (outliers)\n")
+
+    return df
+
+
+def select_appliances(df, appliances):
+    if appliances == "all":
+        return df
+
+    set_difference = np.setdiff1d(appliances, df["appl_type"].unique())
+
+    if set_difference.size > 0:
+        raise KeyError(f"{set_difference} are not in df.")
+
+    if type(appliances) == list:
+        df = df[df["appl_type"].isin(appliances)]
 
     return df
 
@@ -123,3 +143,12 @@ def scale_intervals(X: np.ndarray, scaling_method: str) -> np.ndarray:
         scaler = StandardScaler()
 
     return scaler.fit_transform(X)
+
+
+# %%
+df = load_data(
+    DATA_PATH / "appliance_consumption_data.csv", DATA_PATH / "appliances.csv"
+)
+# %%
+coso = select_appliances(df, ["fridge", "pedo"])
+# %%
