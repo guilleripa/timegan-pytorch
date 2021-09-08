@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, List, Tuple, Union
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -46,9 +46,23 @@ def data_preprocess(
     if dropna:
         df = df.dropna(subset=[column_name])
 
+    df = remove_outliers(df, column_name)
+
     X = create_intervals(df, max_seq_len, column_name)
 
+    X = scale_intervals(X, scaling_method)
+
     return X
+
+
+def remove_outliers(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
+    original_len = len(df)
+    z_scores = stats.zscore(df[column_name], nan_policy="omit")
+    z_filter = np.abs(z_scores) < 3
+    df = df[z_filter]
+    print(f"Dropped {original_len - len(df)} rows (outliers)\n")
+
+    return df
 
 
 def create_intervals(
@@ -100,3 +114,12 @@ def create_meter_intervals(
                 series = np.concatenate((series, interval), axis=0)
 
     return series
+
+
+def scale_intervals(X: np.ndarray, scaling_method: str) -> np.ndarray:
+    if scaling_method == "minmax":
+        scaler = MinMaxScaler()
+    elif scaling_method == "standard":
+        scaler = StandardScaler()
+
+    return scaler.fit_transform(X)
