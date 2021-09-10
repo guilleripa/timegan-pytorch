@@ -1,11 +1,11 @@
 # Necessary packages
-import torch
-from tqdm import tqdm, trange
 import numpy as np
+import torch
 from sklearn.metrics import accuracy_score, mean_squared_error
+from tqdm import tqdm, trange
 
-from metrics.general_rnn import GeneralRNN
 from metrics.dataset import FeaturePredictionDataset, OneStepPredictionDataset
+from metrics.general_rnn import GeneralRNN
 
 
 def rmse_error(y_true, y_pred):
@@ -167,7 +167,7 @@ def one_step_ahead_prediction(train_data, test_data):
     args["n_layers"] = 3
     args["dropout"] = 0.5
     args["padding_value"] = -1.0
-    args["max_seq_len"] = 100 - 1  # only 99 is used for prediction
+    args["max_seq_len"] = 29
     args["learning_rate"] = 1e-3
     args["grad_clip_norm"] = 5.0
 

@@ -102,7 +102,6 @@ def main(args):
     train_data, test_data, train_time, test_time = train_test_split(
         X, T, test_size=args.train_rate, random_state=args.seed
     )
-
     #########################
     # Initialize and Run model
     #########################
@@ -144,23 +143,23 @@ def main(args):
     #########################
 
     # 1. Feature prediction
-    feat_idx = np.random.permutation(train_data.shape[2])[: args.feat_pred_no]
-    print("Running feature prediction using original data...")
-    ori_feat_pred_perf = feature_prediction(
-        (train_data, train_time), (test_data, test_time), feat_idx
-    )
-    print("Running feature prediction using generated data...")
-    new_feat_pred_perf = feature_prediction(
-        (generated_data, generated_time), (test_data, test_time), feat_idx
-    )
+    # feat_idx = np.random.permutation(train_data.shape[2])[: args.feat_pred_no]
+    # print("Running feature prediction using original data...")
+    # ori_feat_pred_perf = feature_prediction(
+    #     (train_data, train_time), (test_data, test_time), feat_idx
+    # )
+    # print("Running feature prediction using generated data...")
+    # new_feat_pred_perf = feature_prediction(
+    #     (generated_data, generated_time), (test_data, test_time), feat_idx
+    # )
 
-    feat_pred = [ori_feat_pred_perf, new_feat_pred_perf]
+    # feat_pred = [ori_feat_pred_perf, new_feat_pred_perf]
 
-    print(
-        "Feature prediction results:\n"
-        + f"(1) Ori: {str(np.round(ori_feat_pred_perf, 4))}\n"
-        + f"(2) New: {str(np.round(new_feat_pred_perf, 4))}\n"
-    )
+    # print(
+    #     "Feature prediction results:\n"
+    #     + f"(1) Ori: {str(np.round(ori_feat_pred_perf, 4))}\n"
+    #     + f"(2) New: {str(np.round(new_feat_pred_perf, 4))}\n"
+    # )
 
     # 2. One step ahead prediction
     print("Running one step ahead prediction using original data...")
