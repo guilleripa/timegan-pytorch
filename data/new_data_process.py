@@ -1,4 +1,4 @@
-# %%
+from functools import partial
 from pathlib import Path
 from typing import Union
 
@@ -7,7 +7,6 @@ import pandas as pd
 from pandas.tseries.offsets import DateOffset
 from scipy import stats
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from torch._C import Value
 
 DATA_PATH = Path("/Volumes/GuilleSSD/edc_data")
 
@@ -37,7 +36,11 @@ def data_preprocess(
     column_name: str = "apower",
     index_column: str = "datetime",
     dropna: bool = True,
-    appliances: Union[list, str] = "all",
+    appliances: Union[list, str] = [
+        "fridge",
+        "air conditioner",
+        "electric water heating appliance",
+    ],
 ) -> np.ndarray:
 
     if not index_column and index_column not in df:
@@ -53,11 +56,14 @@ def data_preprocess(
 
     df = remove_outliers(df, column_name)
 
-    X = create_intervals(df, max_seq_len, column_name)
+    X = create_intervals(df, appliances, max_seq_len, column_name)
 
     X = scale_intervals(X, scaling_method)
 
-    return np.expand_dims(X, -1)
+    if len(X.shape) <= 2:
+        X = np.expand_dims(X, -1)
+
+    return X
 
 
 def remove_outliers(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
@@ -86,27 +92,70 @@ def select_appliances(df, appliances):
 
 
 def create_intervals(
-    df: pd.DataFrame, max_seq_len: int, column_name: str
+    df: pd.DataFrame,
+    appliances: Union[list, str],
+    max_seq_len: int,
+    column_name: str,
 ) -> np.ndarray:
     X = np.array([])
-    for meter_id in df["meter_id"].unique():
-        if len(df[df["meter_id"] == meter_id]) != 0:
 
-            X_meter = create_meter_intervals(
-                df[df["meter_id"] == meter_id], max_seq_len, column_name
-            )
-            if X.size == 0:
-                X = X_meter
-            else:
-                X = np.concatenate((X, X_meter), axis=0)
+    if appliances == "all":
+        index_name = "meter_id"
+        columns = column_name
+    else:
+        df = create_customer_intervals(df, column_name)
+        columns = appliances + ["sin_time", "cos_time"]
+        index_name = "customer_id"
+
+    for meter_id in df[index_name].unique():
+        X_index = create_intervals_(
+            df[df[index_name] == meter_id], max_seq_len, columns
+        )
+        if X.size == 0:
+            X = X_index
+        else:
+            X = np.concatenate((X, X_index), axis=0)
 
     return X
 
 
-def create_meter_intervals(
+def create_customer_intervals(
+    df: pd.DataFrame,
+    column_name: str,
+) -> pd.DataFrame:
+
+    get_max_meter = partial(get_max_consumption_meter, column_name)
+    # Conseguir el appliance con más gasto entre los repetidos
+    df = df.groupby(["customer_id", "appl_type"]).apply(get_max_meter)
+    # drop groupby axes
+    df = df.droplevel([0, 1])
+
+    new_df = (
+        df.groupby("customer_id")
+        .apply(
+            lambda df: df.pivot(
+                index="datetime", columns=["appl_type"], values=["apower"]
+            )
+        )["apower"]
+        .reset_index()
+    )
+
+    df_time = new_df["datetime"]
+    day_seconds = (df_time.dt.hour * 60 + df_time.dt.minute) * 60 + df_time.dt.second
+
+    seconds_in_day = 24 * 60 * 60
+    new_df["sin_time"] = np.sin(2 * np.pi * day_seconds / seconds_in_day)
+    new_df["cos_time"] = np.cos(2 * np.pi * day_seconds / seconds_in_day)
+
+    new_df = new_df.fillna(0)
+
+    return new_df
+
+
+def create_intervals_(
     df: pd.DataFrame,
     seq_length: int,
-    column_name: str,
+    columns: Union[str, list],
     offset: DateOffset = DateOffset(minutes=30),
     error: DateOffset = DateOffset(seconds=10),
 ) -> np.ndarray:
@@ -127,7 +176,7 @@ def create_meter_intervals(
             current_date = next_datetime[interval.index].iloc[-1]
 
         if len(interval) == seq_length:
-            interval = np.array([interval[column_name]])
+            interval = np.array([interval[columns]])
             if series.size == 0:
                 series = interval
             else:
@@ -142,13 +191,18 @@ def scale_intervals(X: np.ndarray, scaling_method: str) -> np.ndarray:
     elif scaling_method == "standard":
         scaler = StandardScaler()
 
-    return scaler.fit_transform(X)
+    if len(X.shape) <= 2:
+        X_transformed = scaler.fit_transform(X)
+    else:
+        X_transformed = np.empty(X.T.shape)
+        for i, appliance_readings in enumerate(X.T):
+            X_transformed_i = scaler.fit_transform(appliance_readings)
+            X_transformed[i] = X_transformed_i
+        X_transformed = X_transformed.T
+
+    return X_transformed
 
 
-# %%
-df = load_data(
-    DATA_PATH / "appliance_consumption_data.csv", DATA_PATH / "appliances.csv"
-)
-# %%
-coso = select_appliances(df, ["fridge", "pedo"])
-# %%
+def get_max_consumption_meter(column_name: str, df: pd.DataFrame):
+    max_meter = df.groupby("meter_id")[column_name].sum().idxmax()
+    return df[df["meter_id"] == max_meter]
