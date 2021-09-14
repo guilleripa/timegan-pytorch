@@ -41,6 +41,7 @@ def data_preprocess(
         "air conditioner",
         "electric water heating appliance",
     ],
+    cyclic_features: bool = True,
 ) -> np.ndarray:
 
     if not index_column and index_column not in df:
@@ -56,7 +57,9 @@ def data_preprocess(
 
     df = remove_outliers(df, column_name)
 
-    X = create_intervals(df, appliances, max_seq_len, column_name)
+    X = create_intervals(
+        df, appliances, max_seq_len, column_name, cyclic_features=cyclic_features
+    )
 
     X = scale_intervals(X, scaling_method)
 
@@ -96,6 +99,7 @@ def create_intervals(
     appliances: Union[list, str],
     max_seq_len: int,
     column_name: str,
+    cyclic_features: bool = True,
 ) -> np.ndarray:
     X = np.array([])
 
@@ -103,8 +107,10 @@ def create_intervals(
         index_name = "meter_id"
         columns = column_name
     else:
-        df = create_customer_intervals(df, column_name)
-        columns = appliances + ["sin_time", "cos_time"]
+        df = create_customer_intervals(df, column_name, cyclic_features=cyclic_features)
+        columns = appliances
+        if cyclic_features:
+            columns += ["sin_time", "cos_time"]
         index_name = "customer_id"
 
     for meter_id in df[index_name].unique():
@@ -122,6 +128,7 @@ def create_intervals(
 def create_customer_intervals(
     df: pd.DataFrame,
     column_name: str,
+    cyclic_features: bool = True,
 ) -> pd.DataFrame:
 
     get_max_meter = partial(get_max_consumption_meter, column_name)
@@ -140,12 +147,15 @@ def create_customer_intervals(
         .reset_index()
     )
 
-    df_time = new_df["datetime"]
-    day_seconds = (df_time.dt.hour * 60 + df_time.dt.minute) * 60 + df_time.dt.second
+    if cyclic_features:
+        df_time = new_df["datetime"]
+        day_seconds = (
+            df_time.dt.hour * 60 + df_time.dt.minute
+        ) * 60 + df_time.dt.second
 
-    seconds_in_day = 24 * 60 * 60
-    new_df["sin_time"] = np.sin(2 * np.pi * day_seconds / seconds_in_day)
-    new_df["cos_time"] = np.cos(2 * np.pi * day_seconds / seconds_in_day)
+        seconds_in_day = 24 * 60 * 60
+        new_df["sin_time"] = np.sin(2 * np.pi * day_seconds / seconds_in_day)
+        new_df["cos_time"] = np.cos(2 * np.pi * day_seconds / seconds_in_day)
 
     new_df = new_df.fillna(0)
 
