@@ -19,6 +19,7 @@ from sklearn.model_selection import train_test_split
 from data.new_data_process import data_preprocess, load_data
 from metrics.metric_utils import (
     feature_prediction,
+    mmd,
     one_step_ahead_prediction,
     reidentify_score,
 )
@@ -118,7 +119,7 @@ def main(args):
     # Log end time
     end = time.time()
 
-    print(f"Generated data preview:\n{generated_data[:2, -10:, :2]}\n")
+    print(f"Generated data preview:\n{generated_data[:2, -10:, :]}\n")
     print(f"Generated data shape:\n{generated_data.shape}\n")
     print(f"Model Runtime: {(end - start)/60} mins\n")
 
@@ -179,6 +180,46 @@ def main(args):
         + f"(2) New: {str(np.round(new_step_ahead_pred_perf, 4))}\n"
     )
 
+    sen_data = 2 * train_data[:, 0, -2] - 1
+    cos_data = np.clip(train_data[:, 0, -1] * 2 - 1, -1, 1)
+    train_data = train_data[
+        np.argsort(
+            np.where(
+                sen_data >= 0, np.arccos(cos_data), 2 * np.pi - np.arccos(cos_data)
+            )
+        )
+    ]
+
+    sen_data = 2 * generated_data[:, 0, -2] - 1
+    cos_data = np.clip(generated_data[:, 0, -1] * 2 - 1, -1, 1)
+    generated_data = generated_data[
+        np.argsort(
+            np.where(
+                sen_data >= 0, np.arccos(cos_data), 2 * np.pi - np.arccos(cos_data)
+            )
+        )
+    ]
+
+    rows, int_len, n = train_data.shape
+
+    dists = torch.pdist(
+        torch.cat(
+            [
+                torch.from_numpy(train_data[:100].reshape((100 * int_len, n))),
+                torch.from_numpy(generated_data[:100].reshape((100 * int_len, n))),
+            ],
+            dim=0,
+        )
+    )
+    sigma = dists.median() / 2
+
+    out_mmd = 0
+    for t_interval, g_interval in zip(train_data, generated_data):
+        out_mmd += mmd(
+            torch.from_numpy(t_interval), torch.from_numpy(g_interval), sigma
+        )
+
+    print(f"MMD: {out_mmd}")
     print(f"Total Runtime: {(time.time() - start)/60} mins\n")
 
     return None

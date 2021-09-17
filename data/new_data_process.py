@@ -206,8 +206,8 @@ def scale_intervals(X: np.ndarray, scaling_method: str) -> np.ndarray:
     else:
         X_transformed = np.empty(X.T.shape)
         for i, appliance_readings in enumerate(X.T):
-            X_transformed_i = scaler.fit_transform(appliance_readings)
-            X_transformed[i] = X_transformed_i
+            X_transformed_i = scaler.fit_transform(appliance_readings.T)
+            X_transformed[i] = X_transformed_i.T
         X_transformed = X_transformed.T
 
     return X_transformed

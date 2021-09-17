@@ -223,3 +223,29 @@ def one_step_ahead_prediction(train_data, test_data):
             perf += rmse_error(test_y, test_p)
 
     return perf
+
+
+def mmd(x, y, sigma):
+    # source: https://torchdrift.org/notebooks/note_on_mmd.html
+    # compare kernel MMD paper and code:
+    # A. Gretton et al.: A kernel two-sample test, JMLR 13 (2012)
+    # http://www.gatsby.ucl.ac.uk/~gretton/mmd/mmd.htm
+    # x shape [n, d] y shape [m, d]
+    # n_perm number of bootstrap permutations to get p-value, pass none to not get p-value
+    n, d = x.shape
+    m, d2 = y.shape
+    assert d == d2
+    xy = torch.cat([x.detach(), y.detach()], dim=0)
+    dists = torch.cdist(xy, xy, p=2.0)
+    # we are a bit sloppy here as we just keep the diagonal and everything twice
+    # note that sigma should be squared in the RBF to match the Gretton et al heuristic
+    k = torch.exp((-1 / (2 * sigma ** 2)) * dists ** 2) + torch.eye(n + m) * 1e-5
+    k_x = k[:n, :n]
+    k_y = k[n:, n:]
+    k_xy = k[:n, n:]
+    # The diagonals are always 1 (up to numerical error, this is (3) in Gretton et al.)
+    # note that their code uses the biased (and differently scaled mmd)
+    mmd = (
+        k_x.sum() / (n * (n - 1)) + k_y.sum() / (m * (m - 1)) - 2 * k_xy.sum() / (n * m)
+    )
+    return mmd
