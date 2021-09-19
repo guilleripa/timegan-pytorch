@@ -40,7 +40,7 @@ def reidentify_score(enlarge_label, pred_label):
     return accuracy
 
 
-def feature_prediction(train_data, test_data, index):
+def feature_prediction(train_data, test_data, index, seq_len):
     """Use the other features to predict a certain feature.
 
     Args:
@@ -72,7 +72,7 @@ def feature_prediction(train_data, test_data, index):
     args["n_layers"] = 3
     args["dropout"] = 0.5
     args["padding_value"] = -1.0
-    args["max_seq_len"] = 100
+    args["max_seq_len"] = seq_len
     args["learning_rate"] = 1e-3
     args["grad_clip_norm"] = 5.0
 
@@ -137,7 +137,7 @@ def feature_prediction(train_data, test_data, index):
     return perf
 
 
-def one_step_ahead_prediction(train_data, test_data):
+def one_step_ahead_prediction(train_data, test_data, seq_len):
     """Use the previous time-series to predict one-step ahead feature values.
 
     Args:
@@ -167,7 +167,7 @@ def one_step_ahead_prediction(train_data, test_data):
     args["n_layers"] = 3
     args["dropout"] = 0.5
     args["padding_value"] = -1.0
-    args["max_seq_len"] = 29
+    args["max_seq_len"] = seq_len - 1
     args["learning_rate"] = 1e-3
     args["grad_clip_norm"] = 5.0
 

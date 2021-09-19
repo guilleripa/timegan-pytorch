@@ -84,12 +84,11 @@ def main(args):
     # Load and preprocess data for model
     #########################
 
-    seq_len = 30
     df = load_data(
         f"{data_path}/appliance_consumption_data.csv", f"{data_path}/appliances.csv"
     )
-    X = data_preprocess(df, seq_len)
-    T = [seq_len] * len(X)
+    X = data_preprocess(df, args.max_seq_len, cyclic_features=args.use_cyclic)
+    T = [args.max_seq_len] * len(X)
 
     print(f"Processed data: {X.shape} (Idx x MaxSeqLen x Features)\n")
     print(f"Original data preview:\n{X[:2, :10]}\n")
@@ -97,7 +96,6 @@ def main(args):
     args.feature_dim = X.shape[-1]
     args.Z_dim = X.shape[-1]
     args.padding_value = -1
-    args.max_seq_len = seq_len
 
     # Train-Test Split data and time
     train_data, test_data, train_time, test_time = train_test_split(
@@ -165,11 +163,11 @@ def main(args):
     # 2. One step ahead prediction
     print("Running one step ahead prediction using original data...")
     ori_step_ahead_pred_perf = one_step_ahead_prediction(
-        (train_data, train_time), (test_data, test_time)
+        (train_data, train_time), (test_data, test_time), args.max_seq_len
     )
     print("Running one step ahead prediction using generated data...")
     new_step_ahead_pred_perf = one_step_ahead_prediction(
-        (generated_data, generated_time), (test_data, test_time)
+        (generated_data, generated_time), (test_data, test_time), args.max_seq_len
     )
 
     step_ahead_pred = [ori_step_ahead_pred_perf, new_step_ahead_pred_perf]
@@ -202,11 +200,15 @@ def main(args):
 
     rows, int_len, n = train_data.shape
 
+    rand_sample = sorted(random.sample(range(rows), 1000))
+
     dists = torch.pdist(
         torch.cat(
             [
-                torch.from_numpy(train_data[:100].reshape((100 * int_len, n))),
-                torch.from_numpy(generated_data[:100].reshape((100 * int_len, n))),
+                torch.from_numpy(train_data[rand_sample].reshape((1000 * int_len, n))),
+                torch.from_numpy(
+                    generated_data[rand_sample].reshape((1000 * int_len, n))
+                ),
             ],
             dim=0,
         )
@@ -244,6 +246,7 @@ if __name__ == "__main__":
     parser.add_argument("--device", choices=["cuda", "cpu"], default="cuda", type=str)
     parser.add_argument("--exp", default="test", type=str)
     parser.add_argument("--is_train", type=str2bool, default=True)
+    parser.add_argument("--use_cyclic", type=str2bool, default=True)
     parser.add_argument("--seed", default=0, type=int)
     parser.add_argument("--feat_pred_no", default=2, type=int)
 

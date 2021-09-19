@@ -1,5 +1,6 @@
 #!/bin/bash
 train=true
+cyclic=true
 export TZ="GMT-8"
 
 # Experiment variables
@@ -14,9 +15,10 @@ python main.py \
 --device            cuda \
 --exp               $exp \
 --is_train          $train \
+--use_cyclic        $cyclic \
 --seed              42 \
 --feat_pred_no      1 \
---max_seq_len       100 \
+--max_seq_len       30 \
 --train_rate        0.5 \
 --emb_epochs        $emb_epochs \
 --sup_epochs        $sup_epochs \
