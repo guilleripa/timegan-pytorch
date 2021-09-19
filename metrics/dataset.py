@@ -31,8 +31,9 @@ class OneStepPredictionDataset(torch.utils.data.Dataset):
     """
 
     def __init__(self, data, time):
+        no, seq_len, dim = data.shape
         self.X = torch.FloatTensor(data[:, :-1, :])
-        self.T = torch.LongTensor([t - 1 if t == 30 else t for t in time])
+        self.T = torch.LongTensor([t - 1 if t == seq_len else t for t in time])
         self.Y = torch.FloatTensor(data[:, 1:, :])
 
     def __len__(self):
